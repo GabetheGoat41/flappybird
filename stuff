@@ -1,0 +1,162 @@
+using UnityEngine;
+
+public class PlayerController : MonoBehaviour
+{
+    // Player movement variables
+    public float moveSpeed = 5f;       // Speed of player movement.
+    public float lookSpeedX = 2f;      // Mouse look sensitivity on the X axis.
+    public float lookSpeedY = 2f;      // Mouse look sensitivity on the Y axis.
+    public float jumpForce = 5f;       // Jump force.
+    public CharacterController controller; // Character controller for collision detection.
+    public Transform playerCamera;     // The camera to move and rotate.
+
+    // Weapon variables
+    public float shootingRange = 50f;  // Range of shooting.
+    public float weaponDamage = 25f;   // Damage per shot.
+
+    // Safe zone variables
+    public Transform safeZoneCenter;  // The center of the safe zone.
+    public float initialRadius = 50f;
+    public float shrinkRate = 1f;
+    private float currentRadius;
+
+    // Health variables
+    public float maxHealth = 100f;
+    private float currentHealth;
+    public bool isInSafeZone = true;
+
+    // Private variables for player control
+    private float xRotation = 0f;      // Variable for storing the camera's X rotation.
+    private bool isGrounded;
+
+    void Start()
+    {
+        currentHealth = maxHealth;
+        currentRadius = initialRadius;
+    }
+
+    void Update()
+    {
+        // Handle Player Movement
+        HandleMovement();
+
+        // Handle Mouse Look (Camera rotation)
+        HandleMouseLook();
+
+        // Handle Jumping
+        HandleJump();
+
+        // Handle Shooting
+        HandleShooting();
+
+        // Handle Safe Zone Shrinking
+        HandleSafeZone();
+
+        // Handle Health
+        HandleHealth();
+    }
+
+    // Handles player movement using WASD
+    void HandleMovement()
+    {
+        isGrounded = controller.isGrounded;
+
+        if (isGrounded && controller.velocity.y < 0)
+        {
+            controller.Move(Vector3.down * 2f * Time.deltaTime);
+        }
+
+        float x = Input.GetAxis("Horizontal");
+        float z = Input.GetAxis("Vertical");
+
+        Vector3 move = transform.right * x + transform.forward * z;
+        controller.Move(move * moveSpeed * Time.deltaTime);
+    }
+
+    // Handles mouse look for camera rotation
+    void HandleMouseLook()
+    {
+        float mouseX = Input.GetAxis("Mouse X") * lookSpeedX;
+        float mouseY = Input.GetAxis("Mouse Y") * lookSpeedY;
+
+        xRotation -= mouseY;
+        xRotation = Mathf.Clamp(xRotation, -90f, 90f); // Limit vertical camera rotation.
+
+        playerCamera.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f); // Rotate camera vertically
+        transform.Rotate(Vector3.up * mouseX); // Rotate the player horizontally
+    }
+
+    // Handles player jumping
+    void HandleJump()
+    {
+        if (isGrounded && Input.GetButtonDown("Jump"))
+        {
+            controller.Move(Vector3.up * jumpForce * Time.deltaTime);
+        }
+    }
+
+    // Handles shooting with the mouse (left-click)
+    void HandleShooting()
+    {
+        if (Input.GetMouseButtonDown(0))  // Left click to shoot.
+        {
+            Shoot();
+        }
+    }
+
+    // Raycast to shoot in the direction of the camera
+    void Shoot()
+    {
+        RaycastHit hit;
+
+        // Perform a raycast from the camera (player's viewpoint)
+        if (Physics.Raycast(playerCamera.transform.position, playerCamera.transform.forward, out hit, shootingRange))
+        {
+            Debug.Log("Hit: " + hit.transform.name);
+
+            // If the object hit has a Health component, apply damage
+            if (hit.transform.GetComponent<Health>() != null)
+            {
+                hit.transform.GetComponent<Health>().TakeDamage(weaponDamage);
+            }
+        }
+    }
+
+    // Shrinks the safe zone over time
+    void HandleSafeZone()
+    {
+        if (currentRadius > 5f)  // Stops shrinking at a minimum radius.
+        {
+            currentRadius -= shrinkRate * Time.deltaTime;
+            transform.localScale = new Vector3(currentRadius * 2, 1, currentRadius * 2);
+            transform.position = safeZoneCenter.position;
+        }
+    }
+
+    // Manages health: taking damage if outside the safe zone
+    void HandleHealth()
+    {
+        if (!isInSafeZone)
+        {
+            TakeDamage(1f * Time.deltaTime); // Taking damage over time when outside the zone.
+        }
+    }
+
+    // Handle taking damage and death
+    public void TakeDamage(float damage)
+    {
+        currentHealth -= damage;
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
+    }
+
+    // Handle player death
+    void Die()
+    {
+        Debug.Log("Player Died");
+        // Handle player death (e.g., game over screen, respawn, etc.).
+        Destroy(gameObject);
+    }
+}
